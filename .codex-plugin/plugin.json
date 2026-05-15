@@ -1,0 +1,32 @@
+{
+  "name": "recoup-platform-plugin",
+  "version": "0.1.0",
+  "description": "Helpers, skills, and commands for working with the Recoup platform from inside Codex.",
+  "author": {
+    "name": "Recoup",
+    "email": "support@recoupable.com",
+    "url": "https://recoupable.com"
+  },
+  "homepage": "https://recoupable.com",
+  "repository": "https://github.com/recoupable/recoup-platform-plugin",
+  "license": "Apache-2.0",
+  "keywords": [
+    "recoup",
+    "recoup-platform",
+    "music",
+    "ai-agents",
+    "agent-skills",
+    "chat",
+    "platform-tooling"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Recoup Platform",
+    "shortDescription": "Helpers and skills for working with the Recoup platform from AI agents",
+    "longDescription": "A general-purpose Recoup platform plugin. Bundles skills and commands that help AI agents work with Recoup's chat, API, and surrounding workflows. Start here for cross-cutting Recoup tooling that does not belong inside a single domain plugin.",
+    "developerName": "Recoup",
+    "category": "Music",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://recoupable.com"
+  }
+}
