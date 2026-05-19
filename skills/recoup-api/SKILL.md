@@ -1,6 +1,6 @@
 ---
 name: recoup-api
-description: Call the Recoupable API from the sandbox to fetch artist data, socials, organizations, research, documents and any other platform resource — and to invoke external connector actions (Google Docs / Drive / Sheets edits, Gmail, TikTok, Instagram, etc.) via Recoupable's shared connections. Use whenever you're asked for Recoup data, a Recoupable platform resource, or to read/write something outside Recoup like a Google Doc URL or a spreadsheet. Triggers on phrases like "look up artist", "fetch from recoup", "artist data", "artist socials", "organizations", "artist report", "research", "create new artist", "create artist", "onboard artist", "add artist", "edit this Google Doc", "read this doc", "update the spreadsheet", "send an email", "post on TikTok", "save to Drive", or whenever the user pastes a docs.google.com / drive.google.com / sheets.google.com URL. Always load this before writing curl calls against recoup-api.vercel.app.
+description: Call the Recoupable API to fetch artist data, socials, organizations, research, documents and any other platform resource — and to invoke external connector actions (Google Docs / Drive / Sheets edits, Gmail, TikTok, Instagram, etc.) via Recoupable's shared connections. Use whenever you're asked for Recoup data, a Recoupable platform resource, or to read/write something outside Recoup like a Google Doc URL or a spreadsheet. Triggers on phrases like "look up artist", "fetch from recoup", "artist data", "artist socials", "organizations", "artist report", "research", "create new artist", "create artist", "onboard artist", "add artist", "edit this Google Doc", "read this doc", "update the spreadsheet", "send an email", "post on TikTok", "save to Drive", or whenever the user pastes a docs.google.com / drive.google.com / sheets.google.com URL. Always load this before writing curl calls against the Recoup API. Credentials come from the sandbox env var `RECOUP_ACCESS_TOKEN` when present, or from the Recoup MCP's `get_api_key` tool when running in Cowork.
 ---
 
 # Recoupable API
@@ -12,6 +12,10 @@ Call the Recoupable production API to fetch artist data, social metrics, org con
 
 ## Authentication
 
+There are two ways the skill receives credentials. Try them in this order before falling back to "user is not authenticated":
+
+### 1. Sandbox environment (open-agents flow)
+
 Your sandbox receives a short-lived access token in `RECOUP_ACCESS_TOKEN`. Use it as a `Bearer` token on every request:
 
 ```bash
@@ -19,7 +23,30 @@ curl -H "Authorization: Bearer $RECOUP_ACCESS_TOKEN" \
   https://recoup-api.vercel.app/api/artists/{artistId}/socials
 ```
 
-If `RECOUP_ACCESS_TOKEN` is empty, the user is not authenticated — tell them to sign in rather than retrying.
+### 2. MCP credential fallback (Cowork / fresh installs)
+
+If `RECOUP_ACCESS_TOKEN` is empty AND the Recoup MCP is connected (you'll see Recoup MCP tools listed in your available tool catalog — e.g. `get_pulses`, `get_api_key`, etc.), fetch the customer's credential via the `get_api_key` MCP tool **once** at the start of the session:
+
+```text
+Call the Recoup MCP tool: get_api_key (no arguments).
+It returns {"api_key": "recoup_sk_..."}.
+```
+
+Export the returned value as `RECOUP_ACCESS_TOKEN` for use in every subsequent curl call:
+
+```bash
+export RECOUP_ACCESS_TOKEN="recoup_sk_..."  # from get_api_key
+curl -H "Authorization: Bearer $RECOUP_ACCESS_TOKEN" \
+  https://recoup-api.vercel.app/api/accounts/id
+```
+
+The Recoup API accepts the same value as either a Bearer token (`Authorization: Bearer ...`) or an API key header (`x-api-key: ...`). Stick with the Bearer convention used throughout this skill so the same curl patterns work regardless of which path issued the credential.
+
+Cache the value in `RECOUP_ACCESS_TOKEN` for the rest of the session — don't re-invoke `get_api_key` before every request.
+
+### 3. No credential available
+
+If both `RECOUP_ACCESS_TOKEN` is empty and the Recoup MCP is not connected, the user is not authenticated — tell them to sign in (via the chat app or by running the `getting-started` skill) rather than retrying.
 
 ## Org scoping (`RECOUP_ORG_ID`)
 
