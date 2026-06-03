@@ -1,7 +1,7 @@
 {
   "name": "recoup-platform-plugin",
-  "version": "0.1.0",
-  "description": "Helpers, skills, and commands for working with the Recoup platform.",
+  "version": "0.2.0",
+  "description": "Onboarding, health checks, and helpers for working with the Recoup platform.",
   "author": {
     "name": "Recoup",
     "email": "support@recoupable.com"
@@ -15,7 +15,7 @@
     "music",
     "ai-agents",
     "agent-skills",
-    "chat",
+    "onboarding",
     "platform-tooling"
   ],
   "skills": "./skills/",
