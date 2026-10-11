@@ -46,7 +46,7 @@ artistId:
 spotifyArtistId:
 spotifyProfileUrl:
 imageUrl:
-cmArtistId:
+researchArtistId:
 ---
 
 # $ARTIST_NAME
@@ -56,7 +56,7 @@ cmArtistId:
 - [ ] 1. Create the artist (\`POST /api/artists\`) — capture \`account_id\` → \`artistId\`
 - [ ] 2. Find canonical Spotify match (\`GET /api/spotify/search\`) — capture \`id\`, \`external_urls.spotify\`, \`images[0].url\`
 - [ ] 3. PATCH artist with image + Spotify profile URL
-- [ ] 4. Structured research — \`/research/lookup\` (capture \`cmArtistId\`) → \`/research/profile\` + \`/research/career\` + \`/research/playlists\` + \`/research/web\`. Save responses under \`## Research\` in this file.
+- [ ] 4. Structured research — \`/research/lookup\` (capture \`researchArtistId\`) → \`/research/profile\` + \`/research/career\` + \`/research/playlists\` + \`/research/web\`. Save responses under \`## Research\` in this file.
 - [ ] 5. Pull Spotify catalog → write \`releases/{album-slug}/RELEASE.md\` per album + \`releases/top-tracks.md\` (see Releases section)
 - [ ] 6. Web search for additional socials (instagram / tiktok / twitter / youtube)
 - [ ] 7. PATCH artist with discovered socials
@@ -68,16 +68,20 @@ EOF
 
 Don't proceed to step 1 until the file exists on disk.
 
-The full curl-by-curl playbook for steps 1–8 lives in the [`create-artist`](https://github.com/recoupable/skills/tree/main/skills/create-artist) skill and on the docs site at `https://docs.recoupable.dev/skills/create-artist`. Load that skill once at scaffold time and follow its 8-step chain.
+The maintained curl playbook is the [create-artist workflow](https://docs.recoupable.dev/workflows/create-artist). Read it at scaffold time and follow its documented request contracts while recording progress here.
 
 ### After every step: tick + persist
 
 Two writes back to `RECOUP.md` after each step completes:
 
 1. **Tick the checkbox** (`- [ ]` → `- [x]`) for the step that just ran.
-2. **Write the captured value** into frontmatter (`artistId:`, `spotifyArtistId:`, `spotifyProfileUrl:`, `imageUrl:`, `cmArtistId:`). Later steps read these values from the frontmatter — never re-derive what's already saved. Larger payloads (research responses, social URLs) belong under their own headed subsection in the body, not in frontmatter.
+2. **Write the captured value** into frontmatter (`artistId:`, `spotifyArtistId:`, `spotifyProfileUrl:`, `imageUrl:`, `researchArtistId:`). Later steps read these values from the frontmatter — never re-derive what's already saved. Larger payloads (research responses, social URLs) belong under their own headed subsection in the body, not in frontmatter.
 
 The file IS the workflow state. If a value isn't on disk, the next turn doesn't know it.
+
+For an older workspace containing `cmArtistId`, resolve and verify the current
+Recoup research ID before filling `researchArtistId`; the legacy value is not
+assumed portable between data connections.
 
 ### Resuming a partial setup
 

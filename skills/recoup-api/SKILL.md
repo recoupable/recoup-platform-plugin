@@ -76,7 +76,7 @@ The full endpoint surface is organized into the sections below. Use this map to 
 - **Songs** — create/get songs by ISRC, manage catalogs (CRUD + add/remove songs), analyze songs via audio LM, list analyze presets
 - **Content Creation** — pipeline trigger, video/image/caption generation, ffmpeg edits, video analysis, upscale, cost estimate, audio transcription, templates
 
-### Research (Chartmetric + Web)
+### Research (Recoup + Web)
 
 One section covering most music-industry lookup work:
 
@@ -149,7 +149,7 @@ For multi-endpoint sequences that need a specific order, follow the published wo
 
 | Workflow | Guide | Driver |
 |----------|-------|--------|
-| Create + research a new artist (full enrichment chain — POST artist, Spotify match, profile/socials/knowledges, structured research via Chartmetric profile/career/playlists + web, KB synthesis) | [https://docs.recoupable.dev/workflows/create-artist](https://docs.recoupable.dev/workflows/create-artist) | `artist-workspace` skill — scaffolds a `RECOUP.md` checklist file, ticks each step on completion |
+| Create + research a new artist (full enrichment chain — POST artist, Spotify match, profile/socials/knowledges, structured research via Recoup profile/career/playlists + web, KB synthesis) | [https://docs.recoupable.dev/workflows/create-artist](https://docs.recoupable.dev/workflows/create-artist) | `artist-workspace` skill — scaffolds a `RECOUP.md` checklist file, ticks each step on completion |
 
 Trigger to load a workflow guide: any phrase like "create a new artist", "onboard X", "add this artist", or any request that requires more than one endpoint to complete.
 
@@ -162,7 +162,7 @@ For reads/writes **outside** Recoup — editing a Google Doc by URL, syncing a s
 - `GET /api/connectors/actions` — catalog of every available action with its `slug`, `description`, `parameters` JSON Schema, `connectorSlug`, and `isConnected`. See [docs](https://docs.recoupable.dev/api-reference/connectors/list-actions).
 - `POST /api/connectors/actions` — execute one by `actionSlug` with `parameters` matching its schema. See [docs](https://docs.recoupable.dev/api-reference/connectors/execute-action).
 
-Slugs are always **UPPERCASE_SNAKE_CASE** (e.g. `GOOGLEDOCS_INSERT_TEXT_ACTION`, `GMAIL_FETCH_EMAILS`). Auth is the same `RECOUP_ACCESS_TOKEN` Bearer. **Always pull the parameters schema from the catalog before executing** — Composio's shapes vary per action.
+Slugs are always **UPPERCASE_SNAKE_CASE** (e.g. `GOOGLEDOCS_INSERT_TEXT_ACTION`, `GMAIL_FETCH_EMAILS`). Connector actions accept the selected REST credential: `x-api-key` or `Authorization: Bearer`. **Always pull the parameters schema from the catalog before executing** — Composio's shapes vary per action.
 
 ### Worked example: Google Doc ↔ sandbox file sync
 
@@ -194,7 +194,7 @@ The Google Doc and the local file are two views of the same content — commit t
 
 | Error | Meaning | Fix |
 |-------|---------|-----|
-| 401 | Token missing, invalid, or expired | Check `RECOUP_ACCESS_TOKEN` is set; if the prompt has been running a long time, ask the user to resend |
+| 401 | Selected credential missing, invalid, or expired | Check `RECOUP_API_KEY` for x-api-key calls or `RECOUP_ACCESS_TOKEN` for Bearer calls; use approved secure setup rather than pasting credentials into chat |
 | 403 | User lacks access to the resource | Confirm the user has permission for the org/artist being queried |
 | 404 | Endpoint not found | Re-check the Docs Map above; the endpoint may have moved or been renamed |
 | 5xx | Server error | Retry once; if persistent, surface the status to the user |
@@ -202,5 +202,5 @@ The Google Doc and the local file are two views of the same content — commit t
 ## When NOT to use this skill
 
 - Reading/writing files inside the sandbox — use the filesystem tools.
-- Calling Chartmetric, Spotify, or other third-party APIs directly — prefer the Recoup **Research** endpoints above (they wrap Chartmetric with our auth), or use the dedicated skill if one exists (e.g. `chartmetric`).
+- Calling Chartmetric, Spotify, or other third-party APIs directly — prefer the Recoup **Research** endpoints above (they use Recoup-managed data connections with our auth), or use the dedicated skill if one exists (e.g. `chartmetric`).
 - Reading the user's git repo contents — that's already mounted in the working directory.
