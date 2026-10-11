@@ -1,6 +1,6 @@
 ---
 name: getting-started
-description: Connect your real Recoup account through the host's MCP OAuth sign-in and verify artist access. Use for "set up Recoup", "connect my account", "connect Claude to Recoup", "I just joined", or "log in". Use separate API credentials only for REST-only capabilities or skills-only installations.
+description: Connect your real Recoup account through the host's MCP OAuth sign-in and verify artist access. Use for "get an API key", "connect to Recoup", "set up Recoup", "connect my account", "connect Claude to Recoup", "I just joined", or "log in". Use separate API credentials only for REST-only capabilities or skills-only installations.
 ---
 
 # Recoup — Connect Account
@@ -17,7 +17,9 @@ storage and refresh. The plugin contains no account credentials.
    list is a valid connection, not proof of a bad account. Never invent a roster.
 3. If authentication is required, direct the user to the host's Recoup connection
    controls. In Claude Code, open `/mcp` and authenticate the plugin's Recoup
-   server. On other hosts, use their MCP/plugin connection UI. Let the user
+   server. If Recoup is not registered, add it first:
+   `claude mcp add --transport http recoup https://api.recoupable.dev/mcp`, then
+   authenticate it through `/mcp`. On other hosts, use their MCP/plugin connection UI. Let the user
    complete browser sign-in and consent; never ask them to paste an OAuth token.
 4. For the full business catalog, approve `mcp:tools` in the consent flow. This
    covers accessible personal and organization workspaces and includes writes,
@@ -48,7 +50,8 @@ If a REST credential is needed and the user authorizes email verification:
 4. Store it only through an available secret facility, or a user-approved local
    environment file with mode `600`. Do not edit shell startup files or global
    agent instructions as part of connection setup.
-5. Verify with authenticated `GET /api/accounts/id`, then continue the requested
+5. Expose the stored key to REST scripts as `RECOUP_API_KEY`; they send it in
+   `x-api-key`, never as an OAuth Bearer token. Verify with authenticated `GET /api/accounts/id`, then continue the requested
    REST operation. Report missing access without fabricating data.
 
 ## Boundaries

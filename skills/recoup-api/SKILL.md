@@ -25,6 +25,19 @@ email/PIN flow and secure storage. Never print keys or put them in global instru
 Personal identity, organization membership and consent are separate: a broader
 MCP grant does not create membership, and an empty artist list can be legitimate.
 
+Select exactly one REST credential header before the examples below:
+
+```bash
+if [ -n "$RECOUP_API_KEY" ]; then
+  AUTH=(-H "x-api-key: $RECOUP_API_KEY")
+elif [ -n "$RECOUP_ACCESS_TOKEN" ]; then
+  AUTH=(-H "Authorization: Bearer $RECOUP_ACCESS_TOKEN")
+else
+  echo "Authenticate REST through the approved real-account setup flow." >&2
+  exit 1
+fi
+```
+
 ## Org scoping (`RECOUP_ORG_ID`)
 
 When running inside a sandbox, the environment also exposes `RECOUP_ORG_ID` — the organization the sandbox was opened for. The access token is account-scoped (it covers every org the account belongs to), so when you use it with unscoped list endpoints like `GET /api/artists` you will get results from **all** of that account's orgs, not just the one this sandbox represents. That mismatch surprises accounts.
@@ -33,7 +46,7 @@ When `RECOUP_ORG_ID` is set, scope list/query endpoints to it:
 
 ```bash
 # Artists for this sandbox's org only
-curl -H "Authorization: Bearer $RECOUP_ACCESS_TOKEN" \
+curl "${AUTH[@]}" \
   "https://api.recoupable.dev/api/organizations/$RECOUP_ORG_ID/artists"
 ```
 
@@ -124,7 +137,7 @@ Do **not** guess exact paths, parameter names, or response shapes — fetch the 
 
 ```bash
 # Get all socials for an artist
-curl -sS -H "Authorization: Bearer $RECOUP_ACCESS_TOKEN" \
+curl -sS "${AUTH[@]}" \
   "https://api.recoupable.dev/api/artists/{artistId}/socials" | jq
 ```
 
@@ -158,7 +171,7 @@ When the user pastes a `docs.google.com/document/d/{ID}/edit` URL, extract the I
 ```bash
 DOC_ID=$(echo "$DOC_URL" | sed -nE 's|.*/document/d/([^/]+).*|\1|p')
 EXEC="https://api.recoupable.dev/api/connectors/actions"
-AUTH=(-H "Authorization: Bearer $RECOUP_ACCESS_TOKEN" -H "Content-Type: application/json")
+AUTH=("${AUTH[@]}" -H "Content-Type: application/json")
 
 # Read the doc into a local file.
 curl -sS -X POST "${AUTH[@]}" "$EXEC" \
