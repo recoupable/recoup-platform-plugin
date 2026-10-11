@@ -1,6 +1,6 @@
 {
   "name": "recoup-platform-plugin",
-  "version": "0.1.1",
+  "version": "0.2.1",
   "description": "Helpers, skills, and commands for working with the Recoup platform from inside Codex.",
   "author": {
     "name": "Recoup",
