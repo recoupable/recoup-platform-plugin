@@ -1,52 +1,29 @@
 ---
 name: recoup-api
-description: Call the Recoupable API to fetch artist data, socials, organizations, research, documents and any other platform resource — and to invoke external connector actions (Google Docs / Drive / Sheets edits, Gmail, TikTok, Instagram, etc.) via Recoupable's shared connections. Use whenever you're asked for Recoup data, a Recoupable platform resource, or to read/write something outside Recoup like a Google Doc URL or a spreadsheet. Triggers on phrases like "look up artist", "fetch from recoup", "artist data", "artist socials", "organizations", "artist report", "research", "create new artist", "create artist", "onboard artist", "add artist", "edit this Google Doc", "read this doc", "update the spreadsheet", "send an email", "post on TikTok", "save to Drive", or whenever the user pastes a docs.google.com / drive.google.com / sheets.google.com URL. Always load this before writing curl calls against the Recoup API. Credentials come from the sandbox env var `RECOUP_ACCESS_TOKEN` when present, or from the Recoup MCP's `get_api_key` tool when running in Cowork.
+description: Call the Recoupable API to fetch artist data, socials, organizations, research, documents and any other platform resource — and to invoke external connector actions (Google Docs / Drive / Sheets edits, Gmail, TikTok, Instagram, etc.) via Recoupable's shared connections. Use whenever you're asked for Recoup data, a Recoupable platform resource, or to read/write something outside Recoup like a Google Doc URL or a spreadsheet. Triggers on phrases like "look up artist", "fetch from recoup", "artist data", "artist socials", "organizations", "artist report", "research", "create new artist", "create artist", "onboard artist", "add artist", "edit this Google Doc", "read this doc", "update the spreadsheet", "send an email", "post on TikTok", "save to Drive", or whenever the user pastes a docs.google.com / drive.google.com / sheets.google.com URL. Always load this before writing curl calls against the Recoup API. Prefer a connected Recoup MCP tool. REST scripts require separate credentials.
 ---
 
 # Recoupable API
 
 Call the Recoupable production API to fetch artist data, social metrics, org context, research, and to trigger platform operations.
 
-- **Base URL:** `https://recoup-api.vercel.app/api`
-- **LLM-readable docs:** `https://developers.recoupable.com` — Mintlify site. Use `/llms.txt` for the endpoint index, `/llms-full.txt` for full content, and the OpenAPI JSONs listed below for machine-readable schemas.
+- **Base URL:** `https://api.recoupable.dev/api`
+- **LLM-readable docs:** `https://docs.recoupable.dev` — Mintlify site. Use `/llms.txt` for the endpoint index, `/llms-full.txt` for full content, and the OpenAPI JSONs listed below for machine-readable schemas.
 
 ## Authentication
 
-There are two ways the skill receives credentials. Try them in this order before falling back to "user is not authenticated":
+Use a matching authenticated Recoup MCP tool at `https://api.recoupable.dev/mcp`
+and its discovered schema first. Let the host manage OAuth and credential refresh;
+never call `get_api_key` to extract an OAuth credential for REST.
 
-### 1. Sandbox environment (open-agents flow)
+REST-only scripts use a separately supplied `RECOUP_API_KEY` (`x-api-key` header),
+or an application-injected `RECOUP_ACCESS_TOKEN` (Bearer header). Missing shell
+credentials do not invalidate a working MCP connection. If REST credentials are
+unavailable, use `getting-started` to explain the real-account sign-in or approved
+email/PIN flow and secure storage. Never print keys or put them in global instructions.
 
-Your sandbox receives a short-lived access token in `RECOUP_ACCESS_TOKEN`. Use it as a `Bearer` token on every request:
-
-```bash
-curl -H "Authorization: Bearer $RECOUP_ACCESS_TOKEN" \
-  https://recoup-api.vercel.app/api/artists/{artistId}/socials
-```
-
-### 2. MCP credential fallback (Cowork / fresh installs)
-
-If `RECOUP_ACCESS_TOKEN` is empty AND the Recoup MCP is connected (you'll see Recoup MCP tools listed in your available tool catalog — e.g. `get_pulses`, `get_api_key`, etc.), fetch the customer's credential via the `get_api_key` MCP tool **once** at the start of the session:
-
-```text
-Call the Recoup MCP tool: get_api_key (no arguments).
-It returns {"api_key": "recoup_sk_..."}.
-```
-
-Export the returned value as `RECOUP_ACCESS_TOKEN` for use in every subsequent curl call:
-
-```bash
-export RECOUP_ACCESS_TOKEN="recoup_sk_..."  # from get_api_key
-curl -H "Authorization: Bearer $RECOUP_ACCESS_TOKEN" \
-  https://recoup-api.vercel.app/api/accounts/id
-```
-
-The Recoup API accepts the same value as either a Bearer token (`Authorization: Bearer ...`) or an API key header (`x-api-key: ...`). Stick with the Bearer convention used throughout this skill so the same curl patterns work regardless of which path issued the credential.
-
-Cache the value in `RECOUP_ACCESS_TOKEN` for the rest of the session — don't re-invoke `get_api_key` before every request.
-
-### 3. No credential available
-
-If both `RECOUP_ACCESS_TOKEN` is empty and the Recoup MCP is not connected, the user is not authenticated — tell them to sign in (via the chat app or by running the `getting-started` skill) rather than retrying.
+Personal identity, organization membership and consent are separate: a broader
+MCP grant does not create membership, and an empty artist list can be legitimate.
 
 ## Org scoping (`RECOUP_ORG_ID`)
 
@@ -57,12 +34,12 @@ When `RECOUP_ORG_ID` is set, scope list/query endpoints to it:
 ```bash
 # Artists for this sandbox's org only
 curl -H "Authorization: Bearer $RECOUP_ACCESS_TOKEN" \
-  "https://recoup-api.vercel.app/api/organizations/$RECOUP_ORG_ID/artists"
+  "https://api.recoupable.dev/api/organizations/$RECOUP_ORG_ID/artists"
 ```
 
 For the Recoup CLI, pass `--org "$RECOUP_ORG_ID"` on commands that accept it. If `RECOUP_ORG_ID` is unset, you are not in an open-agents sandbox — fall back to account-scoped calls as normal.
 
-**Sandbox-inventory shortcut:** for bare "what artists / orgs do I have" questions, prefer reading the local `artists/*/RECOUP.md` tree instead of calling the API at all — the filesystem is authoritative for this sandbox. See the `artist-workspace` skill for the walkthrough.
+**Sandbox-inventory shortcut:** for bare "what artists / orgs do I have" questions, prefer reading the local `artists/*/RECOUP.md` tree instead of calling the API at all — the filesystem is a cached workspace view; confirm current access and freshness through authenticated tools. See the `artist-workspace` skill for the walkthrough.
 
 ## Docs Map
 
@@ -127,7 +104,7 @@ Authentication · CLI · MCP · Quickstart.
 
 ### OpenAPI specs
 
-Machine-readable schemas for the major sections: `accounts.json`, `social.json`, `releases.json`, `research.json`, `content.json` (served at `https://developers.recoupable.com/<name>.json`).
+Machine-readable schemas for the major sections: `accounts.json`, `social.json`, `releases.json`, `research.json`, `content.json` (served at `https://docs.recoupable.dev/<name>.json`).
 
 ## Finding an endpoint
 
@@ -135,10 +112,10 @@ Once you know the section, pull just that section's docs instead of the whole in
 
 ```bash
 # Find the exact path + params for a specific endpoint
-curl -s https://developers.recoupable.com/llms-full.txt | grep -A 30 -i "similar artists"
+curl -s https://docs.recoupable.dev/llms-full.txt | grep -A 30 -i "similar artists"
 
 # Pull the OpenAPI schema for one area
-curl -s https://developers.recoupable.com/research.json | jq '.paths | keys'
+curl -s https://docs.recoupable.dev/research.json | jq '.paths | keys'
 ```
 
 Do **not** guess exact paths, parameter names, or response shapes — fetch the relevant section first.
@@ -148,7 +125,7 @@ Do **not** guess exact paths, parameter names, or response shapes — fetch the 
 ```bash
 # Get all socials for an artist
 curl -sS -H "Authorization: Bearer $RECOUP_ACCESS_TOKEN" \
-  "https://recoup-api.vercel.app/api/artists/{artistId}/socials" | jq
+  "https://api.recoupable.dev/api/artists/{artistId}/socials" | jq
 ```
 
 `jq` is preinstalled in the sandbox.
@@ -159,7 +136,7 @@ For multi-endpoint sequences that need a specific order, follow the published wo
 
 | Workflow | Guide | Driver |
 |----------|-------|--------|
-| Create + research a new artist (full enrichment chain — POST artist, Spotify match, profile/socials/knowledges, structured research via Chartmetric profile/career/playlists + web, KB synthesis) | [https://developers.recoupable.com/workflows/create-artist](https://developers.recoupable.com/workflows/create-artist) | `artist-workspace` skill — scaffolds a `RECOUP.md` checklist file, ticks each step on completion |
+| Create + research a new artist (full enrichment chain — POST artist, Spotify match, profile/socials/knowledges, structured research via Chartmetric profile/career/playlists + web, KB synthesis) | [https://docs.recoupable.dev/workflows/create-artist](https://docs.recoupable.dev/workflows/create-artist) | `artist-workspace` skill — scaffolds a `RECOUP.md` checklist file, ticks each step on completion |
 
 Trigger to load a workflow guide: any phrase like "create a new artist", "onboard X", "add this artist", or any request that requires more than one endpoint to complete.
 
@@ -169,8 +146,8 @@ Trigger to load a workflow guide: any phrase like "create a new artist", "onboar
 
 For reads/writes **outside** Recoup — editing a Google Doc by URL, syncing a sandbox file with Drive, sending an email, posting a TikTok — use the platform's shared third-party connections via two endpoints:
 
-- `GET /api/connectors/actions` — catalog of every available action with its `slug`, `description`, `parameters` JSON Schema, `connectorSlug`, and `isConnected`. See [docs](https://developers.recoupable.com/api-reference/connectors/list-actions).
-- `POST /api/connectors/actions` — execute one by `actionSlug` with `parameters` matching its schema. See [docs](https://developers.recoupable.com/api-reference/connectors/execute-action).
+- `GET /api/connectors/actions` — catalog of every available action with its `slug`, `description`, `parameters` JSON Schema, `connectorSlug`, and `isConnected`. See [docs](https://docs.recoupable.dev/api-reference/connectors/list-actions).
+- `POST /api/connectors/actions` — execute one by `actionSlug` with `parameters` matching its schema. See [docs](https://docs.recoupable.dev/api-reference/connectors/execute-action).
 
 Slugs are always **UPPERCASE_SNAKE_CASE** (e.g. `GOOGLEDOCS_INSERT_TEXT_ACTION`, `GMAIL_FETCH_EMAILS`). Auth is the same `RECOUP_ACCESS_TOKEN` Bearer. **Always pull the parameters schema from the catalog before executing** — Composio's shapes vary per action.
 
@@ -180,7 +157,7 @@ When the user pastes a `docs.google.com/document/d/{ID}/edit` URL, extract the I
 
 ```bash
 DOC_ID=$(echo "$DOC_URL" | sed -nE 's|.*/document/d/([^/]+).*|\1|p')
-EXEC="https://recoup-api.vercel.app/api/connectors/actions"
+EXEC="https://api.recoupable.dev/api/connectors/actions"
 AUTH=(-H "Authorization: Bearer $RECOUP_ACCESS_TOKEN" -H "Content-Type: application/json")
 
 # Read the doc into a local file.

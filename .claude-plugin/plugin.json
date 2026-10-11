@@ -1,7 +1,7 @@
 {
   "name": "recoup-platform-plugin",
-  "version": "0.1.0",
-  "description": "Claude Code plugin for the Recoup platform — helpers, skills, and commands for working with Recoup's chat, API, and agent surface.",
+  "version": "0.1.1",
+  "description": "Claude Code plugin for the Recoup platform \u2014 helpers, skills, and commands for working with Recoup's chat, API, and agent surface.",
   "author": {
     "name": "Recoup",
     "email": "support@recoupable.com",

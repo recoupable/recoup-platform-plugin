@@ -46,13 +46,13 @@ After installing, run the **getting-started** skill:
 
 > Set up Recoup
 
-This walks you through email verification, API key issuance, org lookup, and persisting credentials to Global instructions — so every future Claude session can reach the Recoup API automatically.
+This walks you through host-managed OAuth, scoped tool discovery and an authenticated artist read — so every future Claude session can reach the Recoup API automatically.
 
 ## Skills
 
 | Skill | What it does |
 |-------|-------------|
-| [getting-started](skills/getting-started) | **First-run onboarding.** Email + PIN verification → API key → org lookup → memory block for Global instructions. Run once per account. |
+| [getting-started](skills/getting-started) | **First-run onboarding.** OAuth → tool discovery → authorized artist read; separate secure REST credentials when needed. Run once per account. |
 | [recoup-api](skills/recoup-api) | **API reference + connector actions.** Call any Recoup endpoint (artists, research, content, connectors). Also handles external operations (Google Docs/Drive/Sheets, Gmail, TikTok, Instagram) via shared connections. |
 | [create-artist](skills/create-artist) | **End-to-end artist creation.** 8-step chain: create → Spotify match → profile enrichment → Chartmetric research → catalog pull → social discovery → PATCH socials → synthesize knowledge base. Driven from a checklist file for resumability. |
 | [artist-workspace](skills/artist-workspace) | **Workspace conventions.** How to create, navigate, and organize artist directories. Scaffolds the `RECOUP.md` checklist, manages context files, songs, and releases. The filesystem guide for agents. |
@@ -80,7 +80,7 @@ skills/
 
 ## Required environment
 
-- `RECOUP_API_KEY` or `RECOUP_ACCESS_TOKEN` — obtain via `getting-started` skill or `POST /api/agents/signup`. See [Agents docs](https://developers.recoupable.com/agents).
+- `RECOUP_API_KEY` or `RECOUP_ACCESS_TOKEN` — only for REST-only scripts, supplied through a secret facility or approved environment file; MCP uses host-managed OAuth. See [Agents docs](https://developers.recoupable.com/agents).
 
 ## Related plugins
 
