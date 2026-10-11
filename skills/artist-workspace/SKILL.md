@@ -27,7 +27,7 @@ If `artists/` does not exist, the sandbox has not been set up yet — point the 
 
 ## Creating a new artist
 
-When the user asks to create a new artist (or onboard, add, or set one up), drive the work from a **checklist file** — don't try to run the chain from memory. The setup is 8 sequential API calls and the agent loop loses state between turns; the checklist is what lets you resume cleanly and prove which steps actually ran.
+When the user asks to create a new artist (or onboard, add, or set one up), drive the work from a **checklist file** — don't try to run the chain from memory. The setup is 8 sequential steps and the agent loop loses state between turns; the checklist is what lets you resume cleanly and prove which steps actually ran.
 
 ### Step 0: Scaffold the workspace BEFORE any API call
 

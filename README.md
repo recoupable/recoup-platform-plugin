@@ -54,7 +54,7 @@ This walks you through host-managed OAuth, scoped tool discovery and an authenti
 |-------|-------------|
 | [getting-started](skills/getting-started) | **First-run onboarding.** OAuth → tool discovery → authorized artist read; separate secure REST credentials when needed. Run once per account per host. |
 | [recoup-api](skills/recoup-api) | **API reference + connector actions.** Call any Recoup endpoint (artists, research, content, connectors). Also handles external operations (Google Docs/Drive/Sheets, Gmail, TikTok, Instagram) via shared connections. |
-| [create-artist](skills/create-artist) | **End-to-end artist creation.** 8-step chain: create → Spotify match → profile enrichment → Chartmetric research → catalog pull → social discovery → PATCH socials → synthesize knowledge base. Driven from a checklist file for resumability. |
+| [create-artist](skills/create-artist) | **End-to-end artist creation.** 8-step chain: create → Spotify match → profile enrichment → Recoup research → catalog pull → social discovery → PATCH socials → synthesize knowledge base. Driven from a checklist file for resumability. |
 | [artist-workspace](skills/artist-workspace) | **Workspace conventions.** How to create, navigate, and organize artist directories. Scaffolds the `RECOUP.md` checklist, manages context files, songs, and releases. The filesystem guide for agents. |
 | [setup-sandbox](skills/setup-sandbox) | **Sandbox initialization.** Fetches orgs and artists via CLI, scaffolds the folder structure. Run once when a new sandbox is provisioned. |
 

@@ -1,13 +1,13 @@
 ---
 name: create-artist
-description: End-to-end playbook for creating, identifying, and enriching a new artist account. Use when the user asks to create, add, onboard, or set up a new artist — phrases like "create artist", "onboard X", "add this artist", "set up a new artist", or any task that starts a brand-new artist record from a name. The skill drives 8 sequential API calls (create → Spotify match → PATCH profile → Chartmetric research → Spotify catalog → web socials search → PATCH socials → synthesize KB) from a `RECOUP.md` checklist scaffolded by the `artist-workspace` skill, ticking each box and persisting captured values back to the file as it goes.
+description: End-to-end playbook for creating, identifying, and enriching a new artist account. Use when the user asks to create, add, onboard, or set up a new artist — phrases like "create artist", "onboard X", "add this artist", "set up a new artist", or any task that starts a brand-new artist record from a name. The skill drives 8 sequential steps (create → Spotify match → PATCH profile → Recoup research → Spotify catalog → web socials search → PATCH socials → synthesize KB) from a `RECOUP.md` checklist scaffolded by the `artist-workspace` skill, ticking each box and persisting captured values back to the file as it goes.
 ---
 
 # Create New Artist
 
 The canonical recipe used internally by Recoup's chat agent. Follow it step-by-step to bring a brand-new artist account up to "researched + enriched" parity from a sandbox or any external agent.
 
-The chain is **8 sequential API calls**. Long deterministic chains executed from prose memory tend to drop steps — the agent reads the doc once, runs a couple of calls, and forgets the rest. Drive the work from the `RECOUP.md` checklist file scaffolded by the [`artist-workspace`](https://github.com/recoupable/skills/tree/main/skills/artist-workspace) skill: tick each box and persist captured values back to the frontmatter as you go. The file IS the workflow state, and a fresh turn can resume by reading it.
+The chain is **8 sequential steps**. Long deterministic chains executed from prose memory tend to drop steps — the agent reads the doc once, runs a couple of calls, and forgets the rest. Drive the work from the `RECOUP.md` checklist file scaffolded by the `artist-workspace` skill: tick each box and persist captured values back to the frontmatter as you go. The file IS the workflow state, and a fresh turn can resume by reading it.
 
 ## Prerequisites
 
@@ -32,7 +32,7 @@ fi
 The flow has three phases, all driven from the single checklist file:
 
 1. **Create + identify** — `POST /api/artists`, then find the canonical Spotify match
-2. **Enrich** — `PATCH` the artist with image/label/socials, then run structured research (Chartmetric profile/career/playlists) plus a web search for narrative context and additional socials
+2. **Enrich** — `PATCH` the artist with image/label/socials, then run Recoup research (available profile/activity/playlists) plus a web search for narrative context and additional socials
 3. **Synthesize + persist** — generate a knowledge-base report, save it (RECOUP.md tree or hosted URL), then optionally `PATCH` the `knowledges` array
 
 **Don't run this chain under a throwaway `agent+` account.** Artist data created against an `agent+...@recoupable.com` email is permanently isolated to that account and can't be recovered if the API key is lost. Only run after the user has authenticated with their real email.
@@ -76,20 +76,27 @@ SPOTIFY=$(curl -sS -G "https://api.recoupable.dev/api/spotify/search" \
   --data-urlencode "limit=10")
 ```
 
-Pick the best match: prefer an exact case-insensitive name match; if multiple, prefer the highest popularity score. Export the fields the rest of the chain needs:
+Inspect the returned candidates' names, profile links, images and catalog.
+Set `SELECTED_SPOTIFY_ARTIST_ID` to the verified match; popularity alone does not
+establish identity. If candidates remain ambiguous, resolve that before saving
+the artist's profile.
 
 ```bash
-MATCH=$(echo "$SPOTIFY" | jq --arg name "$ARTIST_NAME" '
-  .artists.items
-  | (map(select((.name | ascii_downcase) == ($name | ascii_downcase))) | sort_by(-.popularity) | first)
-    // (sort_by(-.popularity) | first)
-')
+printf '%s' "$SPOTIFY" | jq '.artists.items[]? | {id, name, external_urls, images}'
+```
 
-SPOTIFY_ARTIST_ID=$(echo "$MATCH" | jq -r '.id // empty')
-SPOTIFY_PROFILE_URL=$(echo "$MATCH" | jq -r '.external_urls.spotify // empty')
-SPOTIFY_IMAGE_URL=$(echo "$MATCH" | jq -r '.images[0].url // empty')
+After verifying the candidate, export its fields:
 
-[ -n "$SPOTIFY_ARTIST_ID" ] || { echo "No Spotify match for $ARTIST_NAME"; exit 1; }
+```bash
+: "${SELECTED_SPOTIFY_ARTIST_ID:?Set the verified Spotify artist ID first}"
+MATCH=$(printf '%s' "$SPOTIFY" | jq --arg id "$SELECTED_SPOTIFY_ARTIST_ID" \
+  '.artists.items[]? | select(.id == $id)')
+
+SPOTIFY_ARTIST_ID=$(printf '%s' "$MATCH" | jq -r '.id // empty')
+SPOTIFY_PROFILE_URL=$(printf '%s' "$MATCH" | jq -r '.external_urls.spotify // empty')
+SPOTIFY_IMAGE_URL=$(printf '%s' "$MATCH" | jq -r '.images[0].url // empty')
+
+[ -n "$SPOTIFY_ARTIST_ID" ] || { echo "No verified Spotify match for $ARTIST_NAME"; exit 1; }
 ```
 
 Also keep `genres`, `followers.total`, and `popularity` from `$MATCH` for the KB report later.
@@ -110,81 +117,104 @@ curl -sS -X PATCH "https://api.recoupable.dev/api/artists/$ARTIST_ID" \
         '{image: $image, profileUrls: {SPOTIFY: $url}}')"
 ```
 
-This single endpoint replaces what the chat tool chain runs as four separate MCP calls (`update_account_info` ×2, `update_artist_socials` ×2). Add `label` to the body once you discover one in the structured research (step 4 — comes back from `/api/research/profile`). Full body schema: `https://docs.recoupable.dev/api-reference/artists/update`.
+This single endpoint replaces what the chat tool chain runs as four separate MCP calls (`update_account_info` ×2, `update_artist_socials` ×2). Add `label` only after verifying it in the research (step 4); profile coverage may be partial. Full body schema: `https://docs.recoupable.dev/api-reference/artists/update`.
 
 **After this step:** tick `- [ ] 3.` → `- [x] 3.`.
 
-## Step 4: Run structured research
+## Step 4: Run Recoup research
 
-Don't use `POST /api/research/deep` here — it tends to hang in sandboxes and returns paraphrased prose. Instead, fan out across four bounded structured endpoints (one prerequisite lookup + three structured pulls + one web search). The outputs are typed JSON the agent can use directly without paraphrasing.
+Resolve the verified Spotify artist to an opaque Recoup research ID, then read
+available profile fields, activity and playlist placements. Coverage varies by
+artist and platform: an empty successful response is a data gap, not a request to
+warm a cache. Use a web search for biography, press and collaborations.
 
-### 4a: Look up the Chartmetric `artist_id`
-
-Most of the structured research endpoints take a Chartmetric `artist_id`, not the Spotify ID. Resolve it once and reuse it for the rest of step 4.
+Check HTTP status before extracting IDs or making dependent calls. This helper
+allows at most three attempts for network failures or `5xx`, each with a
+90-second timeout. A `402` surfaces `billingUrl`; a `429` defers reads until a
+later attempt that respects `Retry-After`. Leave the step unchecked on errors.
 
 ```bash
-LOOKUP=$(curl -sS -G "https://api.recoupable.dev/api/research/lookup" \
-  "${AUTH[@]}" \
-  --data-urlencode "spotifyId=$SPOTIFY_ARTIST_ID")
-
-CM_ARTIST_ID=$(echo "$LOOKUP" | jq -r '.artist.id // empty')
-
-[ -n "$CM_ARTIST_ID" ] || { echo "No Chartmetric match for Spotify ID $SPOTIFY_ARTIST_ID — skipping structured research"; }
+BASE="https://api.recoupable.dev/api"
+research_request() {
+  local path=$1 response body status attempt
+  shift
+  for attempt in 1 2 3; do
+    if response=$(curl -sSL --max-time 90 -w $'\n%{http_code}' \
+      "${AUTH[@]}" "$BASE/research/$path" "$@"); then
+      status=${response##*$'\n'}
+      body=${response%$'\n'*}
+      case "$status" in
+        200) printf '%s' "$body"; return 0 ;;
+        402)
+          printf 'Research needs credits: %s\n' \
+            "$(printf '%s' "$body" | jq -r '.billingUrl // .error // "Check billing"')" >&2
+          return 1 ;;
+        429) echo 'Research rate limited; defer reads and respect Retry-After.' >&2; return 1 ;;
+        5??) ;;
+        *) printf 'Research HTTP %s; resolve before resuming.\n' "$status" >&2; return 1 ;;
+      esac
+    fi
+    if [ "$attempt" -lt 3 ]; then sleep "$((attempt * 2))"; fi
+  done
+  echo 'Research unavailable after three attempts.' >&2
+  return 1
+}
 ```
 
-If the lookup fails (rare — most Spotify-discoverable artists have a Chartmetric profile), skip 4b–4d and just run 4e (web search). Full schema: `https://docs.recoupable.dev/api-reference/research/lookup`.
-
-### 4b: Pull the artist profile
-
-Returns bio, genres, social URLs, label, career stage, and basic metrics — most of what deep research used to paraphrase.
+### 4a: Resolve the research artist ID
 
 ```bash
-PROFILE=$(curl -sS -G "https://api.recoupable.dev/api/research/profile" \
-  "${AUTH[@]}" \
-  --data-urlencode "id=$CM_ARTIST_ID")
+LOOKUP=$(research_request lookup --get \
+  --data-urlencode "spotifyId=$SPOTIFY_ARTIST_ID") || exit 1
+
+RESEARCH_ARTIST_ID=$(printf '%s' "$LOOKUP" | jq -r \
+  '.id | select(type == "string") | select(test("\\S"))')
 ```
 
-Full schema: `https://docs.recoupable.dev/api-reference/research/profile`.
+Save this value as `researchArtistId`. It is separate from the Recoup artist
+account UUID and Spotify ID. Do not coerce it to a number or copy an old
+`cmArtistId` into it; re-resolve and verify older workspaces. If a successful
+lookup has no usable `id`, record that gap and skip 4b–4d, then run 4e.
 
-### 4c: Pull the career timeline
+See [Artist Lookup](https://docs.recoupable.dev/api-reference/research/lookup) for the response contract.
 
-Career milestones, trajectory, and career-stage classification — covers the "notable achievements" portion of what deep research returned.
+### 4b–4d: Read available structured signals
 
 ```bash
-CAREER=$(curl -sS -G "https://api.recoupable.dev/api/research/career" \
-  "${AUTH[@]}" \
-  --data-urlencode "id=$CM_ARTIST_ID")
+if [ -n "$RESEARCH_ARTIST_ID" ]; then
+  PROFILE=$(research_request profile --get \
+    --data-urlencode "id=$RESEARCH_ARTIST_ID") || exit 1
+  CAREER=$(research_request career --get \
+    --data-urlencode "id=$RESEARCH_ARTIST_ID") || exit 1
+  PLAYLISTS=$(research_request playlists --get \
+    --data-urlencode "id=$RESEARCH_ARTIST_ID") || exit 1
+fi
 ```
 
-Full schema: `https://docs.recoupable.dev/api-reference/research/career`.
+Inspect the fields actually returned. Profile data may be partial; `career` is
+an available activity feed, not a guaranteed complete career timeline.
+`playlists` returns `placements`, which may be empty. Do not turn missing data
+into zero or infer a label, achievement or placement that is absent.
 
-### 4d: Pull editorial + algorithmic playlist placements
+See [Artist Profile](https://docs.recoupable.dev/api-reference/research/profile),
+[Artist Activity](https://docs.recoupable.dev/api-reference/research/career) and
+[Playlist Placements](https://docs.recoupable.dev/api-reference/research/playlists).
 
-Replaces the "playlists / radio rotations / editorial features" portion of the deep-research Spotify-presence query.
-
-```bash
-PLAYLISTS=$(curl -sS -G "https://api.recoupable.dev/api/research/playlists" \
-  "${AUTH[@]}" \
-  --data-urlencode "id=$CM_ARTIST_ID")
-```
-
-Full schema: `https://docs.recoupable.dev/api-reference/research/playlists`.
-
-### 4e: Web search for narrative / press / collaborations
-
-Structured endpoints don't cover press coverage, cultural narrative, or recent feature/collab announcements. Fill that gap with a single web search.
+### 4e: Search for narrative, press and collaborations
 
 ```bash
-RESEARCH_WEB=$(curl -sS -X POST "https://api.recoupable.dev/api/research/web" \
-  "${AUTH[@]}" \
+RESEARCH_WEB=$(research_request web -X POST \
   -H "Content-Type: application/json" \
   -d "$(jq -n --arg name "$ARTIST_NAME" \
-        '{query: ($name + " biography press recent collaborations")}')")
+        '{query: ($name + " biography press recent collaborations")}')") || exit 1
 ```
 
-Full schema: `https://docs.recoupable.dev/api-reference/research/web`.
+Verify source links before asserting a fact. See [Web Search](https://docs.recoupable.dev/api-reference/research/web).
 
-**After this step:** persist `cmArtistId: $CM_ARTIST_ID` into the frontmatter, save the four response payloads (profile, career, playlists, web) into a new `## Research` section of `RECOUP.md` — one subsection per endpoint, each with the raw JSON or a tight markdown summary so step 8 can compose from it. Tick `- [ ] 4.` → `- [x] 4.`.
+**After this step:** persist `researchArtistId` when available. Save the returned
+payloads, source links and coverage gaps under `## Research` in `RECOUP.md`, with
+one subsection per request. Tick step 4 only after the successful reads and any
+intentional structured-data skip have been recorded.
 
 ## Step 5: Pull the Spotify catalog
 
@@ -207,7 +237,7 @@ ALBUM_DETAIL=$(curl -sS -G "https://api.recoupable.dev/api/spotify/album" \
 
 Full schemas: top tracks (`/api-reference/spotify/artist-top-tracks`), albums (`/api-reference/spotify/artist-albums`), album detail (`/api-reference/spotify/album`).
 
-**After this step:** populate the artist's `releases/` folder — write one `releases/{release-slug}/RELEASE.md` per album (album slugs are bare, `-ep` / `-single` / `-compilation` suffixes for other types) using the per-album `GET /api/spotify/album?id=$ALBUM_ID` response, and write the top tracks snapshot to `releases/top-tracks.md`. `RELEASE.md` is the 18-section master release-management document — Step 5 fills the Spotify-derivable fields and leaves the rest as `⚠️ TBD`. The full template + the field-by-field Spotify mapping live in the [`artist-workspace`](https://github.com/recoupable/skills/tree/main/skills/artist-workspace) skill at `references/release-template.md`. Tick `- [ ] 5.` → `- [x] 5.`.
+**After this step:** populate the artist's `releases/` folder — write one `releases/{release-slug}/RELEASE.md` per album (album slugs are bare, `-ep` / `-single` / `-compilation` suffixes for other types) using the per-album `GET /api/spotify/album?id=$ALBUM_ID` response, and write the top tracks snapshot to `releases/top-tracks.md`. `RELEASE.md` is the 18-section master release-management document — Step 5 fills the Spotify-derivable fields and leaves the rest as `⚠️ TBD`. The full template + the field-by-field Spotify mapping live in the `artist-workspace` skill at `references/release-template.md`. Tick `- [ ] 5.` → `- [x] 5.`.
 
 ## Step 6: Search the web for additional socials
 
@@ -258,7 +288,7 @@ Combine the structured research outputs (`## Research` section — profile, care
 
 Append the report to the same `RECOUP.md` you scaffolded in Step 0 — add it as a `## Knowledge base` section below the checklist. The path is `artists/$ARTIST_SLUG/RECOUP.md`.
 
-This dovetails with the [`artist-workspace`](https://github.com/recoupable/skills/tree/main/skills/artist-workspace) skill's filesystem conventions, so future sandbox sessions can read both the checklist and the KB without needing a hosted URL.
+This dovetails with the `artist-workspace` skill's filesystem conventions, so future sandbox sessions can read both the checklist and the KB without needing a hosted URL.
 
 **After this step:** tick `- [ ] 8.` → `- [x] 8.`. With every box ticked, the artist is fully set up.
 
